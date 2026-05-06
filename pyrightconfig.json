@@ -1,5 +1,6 @@
 {
   "include": ["src", "main.py"],
+  "exclude": ["tests", ".venv"],
   "venvPath": ".",
   "venv": ".venv",
   "typeCheckingMode": "basic",
