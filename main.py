@@ -9,6 +9,7 @@ from src.syncer import (
   collect_conflicts,
   count_bookmarks,
   find_folder,
+  now_ts,
 )
 from src.writer import write_bookmark_file
 
@@ -46,6 +47,14 @@ def main() -> None:
     for name, profile in profiles.items():
       assert profile.root is not None
       folder = find_folder(profile.root, shared_folder)
+      if folder is None:
+        folder = FolderNode(
+          name=shared_folder,
+          add_date=now_ts(),
+          last_modified=now_ts(),
+          children=[],
+        )
+        profile.root.children.append(folder)
       folder_maps[name] = folder
     conflicts = collect_conflicts(folder_maps, [shared_folder])
     all_conflicts.extend(conflicts)
@@ -80,6 +89,14 @@ def main() -> None:
     for name, profile in profiles.items():
       assert profile.root is not None
       folder = find_folder(profile.root, shared_folder)
+      if folder is None:
+        folder = FolderNode(
+          name=shared_folder,
+          add_date=now_ts(),
+          last_modified=now_ts(),
+          children=[],
+        )
+        profile.root.children.append(folder)
       root_maps[name] = folder
 
     folder_decisions = [
@@ -93,7 +110,11 @@ def main() -> None:
   for name, profile in profiles.items():
     assert profile.root is not None
     write_bookmark_file(profile.root, profile.filepath)
-    print(f"  [V] {name}: сохранено (бэкап: {profile.filepath}.bak)")
+    bak = write_bookmark_file(profile.root, profile.filepath)
+    msg = f"  [V] {name}: сохранено"
+    if bak:
+      msg += f" (бэкап: {bak})"
+    print(msg)
 
   show_sync_summary(
     conflicts_found=len(all_conflicts),

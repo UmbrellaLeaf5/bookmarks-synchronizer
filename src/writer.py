@@ -4,19 +4,28 @@ import os
 import shutil
 import time
 from datetime import datetime
+from pathlib import Path
 
 from src.models import BookmarkItem, FolderNode
 
 
+BACKUP_DIR = Path("bookmarks") / "backups"
+
+
 def backup_file(filepath: str) -> str:
-  backup_path = filepath + ".bak"
-  if os.path.exists(filepath):
-    shutil.copy2(filepath, backup_path)
+  if not os.path.exists(filepath):
+    return ""
+  BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+  stem = Path(filepath).stem
+  ts = datetime.fromtimestamp(os.path.getmtime(filepath)).strftime("%Y%m%d_%H%M%S")
+  backup_path = str(BACKUP_DIR / f"{stem}_{ts}.html")
+  shutil.copy2(filepath, backup_path)
   return backup_path
 
 
-def write_bookmark_file(root: FolderNode, filepath: str) -> None:
-  backup_file(filepath)
+def write_bookmark_file(root: FolderNode, filepath: str) -> str:
+  """Write bookmark file. Returns the backup path if one was created, else ''."""
+  bak = backup_file(filepath)
 
   lines: list[str] = [
     "<!DOCTYPE NETSCAPE-Bookmark-file-1>",
@@ -51,6 +60,8 @@ def write_bookmark_file(root: FolderNode, filepath: str) -> None:
 
   with open(filepath, "w", encoding="utf-8") as f:
     f.write("\n".join(lines))
+
+  return bak
 
 
 def _write_entry(entry: FolderNode | BookmarkItem, lines: list[str], indent: int) -> None:

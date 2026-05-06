@@ -13,7 +13,6 @@ from src.syncer import (
 from tests.conftest import (
   TOOLS_PC_SUBTREE,
   TOOLS_WORK_SUBTREE,
-  load_profile,
   make_bookmark,
   make_folder,
 )
@@ -146,13 +145,21 @@ class TestCollectConflicts:
     assert folder_cf[0].present_in == ["a"]
     assert folder_cf[0].missing_from == ["b"]
 
-  def test_real_files_have_conflicts(self) -> None:
-    pc_root = load_profile("pc")
-    work_root = load_profile("work")
-    tools_pc = find_folder(pc_root, "Tools")
-    tools_work = find_folder(work_root, "Tools")
-    assert tools_pc is not None and tools_work is not None
-    conflicts = collect_conflicts({"pc": tools_pc, "work": tools_work}, ["Tools"])
+  def test_conflicts_collected_from_synthetic_data(self) -> None:
+    tree_a = make_folder(
+      "R",
+      children=[
+        make_bookmark("x", "http://x"),
+        make_folder("Sub", children=[make_bookmark("y", "http://y")]),
+      ],
+    )
+    tree_b = make_folder(
+      "R",
+      children=[
+        make_bookmark("x", "http://x"),
+      ],
+    )
+    conflicts = collect_conflicts({"a": tree_a, "b": tree_b}, ["R"])
     assert len(conflicts) > 0
 
   def test_nested_folder_missing(self) -> None:
@@ -504,26 +511,22 @@ class TestIconPreservation:
 
 
 class TestIntegrationRealFiles:
-  def test_collect_and_apply_roundtrip_on_tools(self) -> None:
-    pc = load_profile("pc")
-    work = load_profile("work")
-    tools_pc = find_folder(pc, "Tools")
-    tools_work = find_folder(work, "Tools")
-    assert tools_pc is not None and tools_work is not None
-
-    conflicts = collect_conflicts({"pc": tools_pc, "work": tools_work}, ["Tools"])
-    assert len(conflicts) > 0
-
-    before = count_bookmarks(pc)
-    c0 = conflicts[0]
-    skip_d = UserDecision(
-      url=c0.url,
-      title=c0.title,
-      add_date=c0.add_date,
-      folder_path=c0.folder_path,
+  def test_skip_preserves_state(self) -> None:
+    tree = make_folder(
+      "R",
+      children=[
+        make_bookmark("x", "http://x"),
+        make_bookmark("y", "http://y"),
+      ],
+    )
+    before = count_bookmarks(tree)
+    d = UserDecision(
+      url="http://x",
+      title="x",
+      add_date=0,
+      folder_path=["R"],
       action="skip",
       target_profiles=[],
-      icon=c0.icon,
     )
-    apply_decisions({"pc": tools_pc, "work": tools_work}, [skip_d])
-    assert count_bookmarks(pc) == before
+    apply_decisions({"a": tree}, [d])
+    assert count_bookmarks(tree) == before

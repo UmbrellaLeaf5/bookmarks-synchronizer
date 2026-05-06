@@ -1,12 +1,22 @@
 from __future__ import annotations
 
 import os
+import shutil
 
 from src.models import BookmarkItem, FolderNode
 from src.parser import parse_bookmark_file
 from src.syncer import count_bookmarks, find_folder
-from src.writer import write_bookmark_file
+from src.writer import BACKUP_DIR, write_bookmark_file
 from tests.conftest import load_profile
+
+
+def _cleanup(files: list[str]) -> None:
+  for f in files:
+    if os.path.exists(f):
+      os.remove(f)
+  # Clean backup dir after each test
+  if BACKUP_DIR.exists():
+    shutil.rmtree(BACKUP_DIR)
 
 
 def test_roundtrip_pc_preserves_count() -> None:
@@ -23,9 +33,7 @@ def test_roundtrip_pc_preserves_count() -> None:
     assert orig == new_count, f"Bookmark count changed: {orig} → {new_count}"
     assert orig_folders == new_folders, "Top-level folders changed"
   finally:
-    for f in (tmp, tmp + ".bak"):
-      if os.path.exists(f):
-        os.remove(f)
+    _cleanup([tmp])
 
 
 def test_roundtrip_all_profiles() -> None:
@@ -38,24 +46,22 @@ def test_roundtrip_all_profiles() -> None:
       root2 = parse_bookmark_file(tmp)
       assert orig_count == count_bookmarks(root2)
     finally:
-      for f in (tmp, tmp + ".bak"):
-        if os.path.exists(f):
-          os.remove(f)
+      _cleanup([tmp])
 
 
-def test_backup_created() -> None:
+def test_backup_created_in_backups_dir() -> None:
   root = load_profile("pc")
   tmp = "bookmarks/_test_bak.html"
   try:
-    # First create a dummy file
     with open(tmp, "w") as f:
       f.write("dummy")
-    write_bookmark_file(root, tmp)
-    assert os.path.exists(tmp + ".bak"), "Backup file not created"
+    bak = write_bookmark_file(root, tmp)
+    assert bak != "", "Backup path should not be empty"
+    assert os.path.exists(bak), f"Backup not found: {bak}"
+    assert "backups" in bak, f"Backup not in backups dir: {bak}"
+    assert bak.endswith(".html"), f"Backup should have .html extension: {bak}"
   finally:
-    for f in (tmp, tmp + ".bak"):
-      if os.path.exists(f):
-        os.remove(f)
+    _cleanup([tmp])
 
 
 def test_backup_not_created_for_new_file() -> None:
@@ -63,13 +69,11 @@ def test_backup_not_created_for_new_file() -> None:
   tmp = "bookmarks/_test_new.html"
   try:
     assert not os.path.exists(tmp)
-    write_bookmark_file(root, tmp)
+    bak = write_bookmark_file(root, tmp)
+    assert bak == "", "Backup should not be created for new file"
     assert os.path.exists(tmp), "File not written"
-    assert not os.path.exists(tmp + ".bak"), "Backup should not exist for new file"
   finally:
-    for f in (tmp, tmp + ".bak"):
-      if os.path.exists(f):
-        os.remove(f)
+    _cleanup([tmp])
 
 
 def test_icon_preserved_in_roundtrip() -> None:
@@ -94,6 +98,4 @@ def test_icon_preserved_in_roundtrip() -> None:
     )
     assert found is not None, f"Icon not preserved: {orig_icon[:30]}..."
   finally:
-    for f in (tmp, tmp + ".bak"):
-      if os.path.exists(f):
-        os.remove(f)
+    _cleanup([tmp])
