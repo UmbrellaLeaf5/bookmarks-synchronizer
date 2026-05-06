@@ -2,99 +2,97 @@ from __future__ import annotations
 
 import os
 import shutil
-import time
 from datetime import datetime
 from pathlib import Path
 
-from src.models import BookmarkItem, FolderNode
+from src.models.tree import BookmarkItem, FolderNode
+from src.utils import BACKUP_DIR, escape_html
 
 
-BACKUP_DIR = Path("bookmarks") / "backups"
+class Writer:
+  def __init__(self, backup_dir: str | Path | None = None) -> None:
+    self._backup_dir = Path(backup_dir) if backup_dir else BACKUP_DIR
 
+  def write(self, root: FolderNode, filepath: str) -> str:
+    """Write bookmark file. Returns the backup path if one was created, else ''."""
+    bak = self._backup(filepath)
 
-def backup_file(filepath: str) -> str:
-  if not os.path.exists(filepath):
-    return ""
-  BACKUP_DIR.mkdir(parents=True, exist_ok=True)
-  stem = Path(filepath).stem
-  ts = datetime.fromtimestamp(os.path.getmtime(filepath)).strftime("%Y%m%d_%H%M%S")
-  backup_path = str(BACKUP_DIR / f"{stem}_{ts}.html")
-  shutil.copy2(filepath, backup_path)
-  return backup_path
+    lines: list[str] = [
+      "<!DOCTYPE NETSCAPE-Bookmark-file-1>",
+      "<!-- This is an automatically generated file.",
+      "     It will be read and overwritten.",
+      "     DO NOT EDIT! -->",
+      '<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=UTF-8">',
+      "<TITLE>Bookmarks</TITLE>",
+      "<H1>Bookmarks</H1>",
+      "<DL><p>",
+    ]
 
+    bar_add_date = root.add_date or 0
+    timestamps = []
 
-def write_bookmark_file(root: FolderNode, filepath: str) -> str:
-  """Write bookmark file. Returns the backup path if one was created, else ''."""
-  bak = backup_file(filepath)
+    for child in root.children:
+      if isinstance(child, FolderNode):
+        timestamps.append(child.last_modified)
 
-  lines: list[str] = [
-    "<!DOCTYPE NETSCAPE-Bookmark-file-1>",
-    "<!-- This is an automatically generated file.",
-    "     It will be read and overwritten.",
-    "     DO NOT EDIT! -->",
-    '<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=UTF-8">',
-    "<TITLE>Bookmarks</TITLE>",
-    "<H1>Bookmarks</H1>",
-    "<DL><p>",
-  ]
+      elif isinstance(child, BookmarkItem):
+        timestamps.append(child.add_date)
 
-  bar_add_date = root.add_date or 0
-  timestamps = []
-  for child in root.children:
-    if isinstance(child, FolderNode):
-      timestamps.append(child.last_modified)
-    elif isinstance(child, BookmarkItem):
-      timestamps.append(child.add_date)
-  bar_last_mod = max(timestamps) if timestamps else 0
+    bar_last_mod = max(timestamps) if timestamps else 0
 
-  lines.append(
-    f'    <DT><H3 ADD_DATE="{bar_add_date}"'
-    f' LAST_MODIFIED="{bar_last_mod}"'
-    f' PERSONAL_TOOLBAR_FOLDER="true">{root.name}</H3>'
-  )
-  lines.append("    <DL><p>")
-  for child in root.children:
-    _write_entry(child, lines, indent=8)
-  lines.append("    </DL><p>")
-  lines.append("</DL><p>")
-
-  with open(filepath, "w", encoding="utf-8") as f:
-    f.write("\n".join(lines))
-
-  return bak
-
-
-def _write_entry(entry: FolderNode | BookmarkItem, lines: list[str], indent: int) -> None:
-  prefix = " " * indent
-  if isinstance(entry, FolderNode):
     lines.append(
-      f'{prefix}<DT><H3 ADD_DATE="{entry.add_date}"'
-      f' LAST_MODIFIED="{entry.last_modified}">{_escape_html(entry.name)}</H3>'
-    )
-    lines.append(f"{prefix}<DL><p>")
-    for child in entry.children:
-      _write_entry(child, lines, indent + 4)
-    lines.append(f"{prefix}</DL><p>")
-  elif isinstance(entry, BookmarkItem):
-    icon_attr = f' ICON="{entry.icon}"' if entry.icon else ""
-    lines.append(
-      f'{prefix}<DT><A HREF="{entry.url}"'
-      f' ADD_DATE="{entry.add_date}"{icon_attr}>{_escape_html(entry.title)}</A>'
+      f'    <DT><H3 ADD_DATE="{bar_add_date}"'
+      f' LAST_MODIFIED="{bar_last_mod}"'
+      f' PERSONAL_TOOLBAR_FOLDER="true">{escape_html(root.name)}</H3>'
     )
 
+    lines.append("    <DL><p>")
+    for child in root.children:
+      self._write_entry(child, lines, indent=8)
 
-def _escape_html(text: str) -> str:
-  return (
-    text.replace("&", "&amp;")
-    .replace("<", "&lt;")
-    .replace(">", "&gt;")
-    .replace('"', "&quot;")
-  )
+    lines.append("    </DL><p>")
+    lines.append("</DL><p>")
 
+    with open(filepath, "w", encoding="utf-8") as f:
+      f.write("\n".join(lines))
 
-def now_timestamp() -> int:
-  return int(time.time())
+    return bak
 
+  def _backup(self, filepath: str) -> str:
+    if not os.path.exists(filepath):
+      return ""
 
-def format_timestamp(ts: int) -> str:
-  return datetime.fromtimestamp(ts).strftime("%d.%m.%Y %H:%M")
+    self._backup_dir.mkdir(parents=True, exist_ok=True)
+    stem = Path(filepath).stem
+    ts = datetime.fromtimestamp(os.path.getmtime(filepath)).strftime("%Y%m%d_%H%M%S")
+    backup_path = str(self._backup_dir / f"{stem}_{ts}.html")
+
+    shutil.copy2(filepath, backup_path)
+
+    return backup_path
+
+  def _write_entry(
+    self, entry: FolderNode | BookmarkItem, lines: list[str], indent: int
+  ) -> None:
+    prefix = " " * indent
+
+    if isinstance(entry, FolderNode):
+      lines.append(
+        f'{prefix}<DT><H3 ADD_DATE="{entry.add_date}"'
+        f' LAST_MODIFIED="{entry.last_modified}">{escape_html(entry.name)}</H3>'
+      )
+
+      lines.append(f"{prefix}<DL><p>")
+
+      for child in entry.children:
+        self._write_entry(child, lines, indent + 4)
+
+      lines.append(f"{prefix}</DL><p>")
+
+    elif isinstance(entry, BookmarkItem):
+      icon_attr = f' ICON="{entry.icon}"' if entry.icon else ""
+
+      lines.append(
+        f'{prefix}<DT><A HREF="{entry.url}"'
+        f' ADD_DATE="{entry.add_date}"{icon_attr}>{escape_html(entry.title)}</A>'
+      )

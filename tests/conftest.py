@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from src.models import BookmarkItem, FolderNode
-from src.parser import parse_bookmark_file
+from src.parser import Parser
 
 
 BOOKMARKS_DIR = Path("bookmarks")
@@ -11,10 +11,7 @@ BOOKMARKS_DIR = Path("bookmarks")
 
 def load_profile(name: str) -> FolderNode:
   path = BOOKMARKS_DIR / f"bookmarks_for_{name}.html"
-  return parse_bookmark_file(str(path))
-
-
-# Shared test data: synthetic folder structures for precise control
+  return Parser().parse(str(path))
 
 
 def make_bookmark(
@@ -71,9 +68,7 @@ TOOLS_PC_SUBTREE = make_folder(
     ),
     make_folder(
       "Important",
-      children=[
-        make_bookmark("nbki", "https://nbki.ru/", 200),
-      ],
+      children=[make_bookmark("nbki", "https://nbki.ru/", 200)],
     ),
   ],
 )

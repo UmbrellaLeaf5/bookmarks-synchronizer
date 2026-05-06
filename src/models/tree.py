@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass, field
 
 
@@ -17,6 +18,9 @@ class FolderNode:
   add_date: int
   last_modified: int
   children: list[FolderNode | BookmarkItem] = field(default_factory=list)
+
+  def deep_copy(self) -> FolderNode:
+    return copy.deepcopy(self)
 
 
 @dataclass
