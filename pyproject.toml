@@ -3,6 +3,9 @@ name = "bookmarks-manager"
 version = "0.1.0"
 description = "Sync Chrome bookmarks across profiles"
 requires-python = ">=3.10"
+dependencies = [
+    "loguru>=0.7.3",
+]
 
 [dependency-groups]
 dev = [

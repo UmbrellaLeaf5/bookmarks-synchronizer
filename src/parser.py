@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import re
 
 from src.models.tree import BookmarkItem, FolderNode
@@ -9,8 +7,8 @@ from src.utils import unescape_html
 class Parser:
   _H3_RE = re.compile(
     r"<DT><H3\s+ADD_DATE=\"(\d+)\"\s+LAST_MODIFIED=\"(\d+)\""
-    r"(?:\s+PERSONAL_TOOLBAR_FOLDER=\"true\")?(?:.|\n)*?"
-    r">(.+?)</H3>"
+    r"(?:\s+PERSONAL_TOOLBAR_FOLDER=\"true\")?>"
+    r"(.+?)</H3>"
   )
 
   _A_RE = re.compile(

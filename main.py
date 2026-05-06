@@ -1,22 +1,30 @@
-from __future__ import annotations
+import sys
+
+from loguru import logger
 
 from src.cli import Cli
 from src.config import load_config
 from src.models.sync import SyncAction
-from src.models.tree import FolderNode, Profile
+from src.models.tree import Profile
 from src.parser import Parser
 from src.syncer import Syncer
-from src.utils import count_bookmarks, find_folder, now_ts
+from src.utils import count_bookmarks, setup_logging
 from src.writer import Writer
 
 
 def main() -> None:
+  setup_logging()
+  logger.info("Bookmarks Manager started")
+
+  dry_run = "--dry-run" in sys.argv
+
   print("=" * 60)
   print("  Bookmarks Manager — синхронизация закладок Chrome")
+  if dry_run:
+    print("  [DRY-RUN] Файлы не будут изменены")
   print("=" * 60)
 
   parser = Parser()
-  syncer = Syncer()
   writer = Writer()
 
   cli = Cli()
@@ -28,6 +36,7 @@ def main() -> None:
     config = load_config("config.json")
 
   except (FileNotFoundError, ValueError) as e:
+    logger.error(f"Config load failed: {e}")
     print(f"  [X] {e}")
     return
 
@@ -39,6 +48,7 @@ def main() -> None:
   profiles: dict[str, Profile] = {}
 
   for name, path in config.profiles.items():
+    logger.debug(f"Parsing {name}: {path}")
     root = parser.parse(path)
     total = count_bookmarks(root)
     profiles[name] = Profile(name=name, filepath=path, root=root)
@@ -46,25 +56,23 @@ def main() -> None:
 
   print("  [V] Все файлы прочитаны")
 
+  syncer = Syncer(
+    {name: profile.root for name, profile in profiles.items() if profile.root is not None}
+  )
+
   # 3. Collect conflicts
   print("\n[3/5] Поиск расхождений в общих папках...")
   all_conflicts = []
 
   for shared_folder in config.shared_folders:
-    folder_maps: dict[str, FolderNode | None] = {}
-
-    for name, profile in profiles.items():
-      assert profile.root is not None
-      folder = _ensure_folder(profile.root, shared_folder)
-      folder_maps[name] = folder
-
-    conflicts = syncer.collect_conflicts(folder_maps, [shared_folder])
+    conflicts = syncer.collect_conflicts(shared_folder)
     all_conflicts.extend(conflicts)
 
     print(f'  Папка "{shared_folder}": {len(conflicts)} расхождений')
 
   if not all_conflicts:
     print("\n  [V] Расхождений нет. Все профили синхронизированы.")
+    logger.info("No conflicts found, exiting")
     return
 
   print(f"\n  Всего расхождений: {len(all_conflicts)}")
@@ -74,15 +82,20 @@ def main() -> None:
 
   decisions = []
 
-  for i, conflict in enumerate(all_conflicts, 1):
-    print(f"\n  --- Конфликт {i}/{len(all_conflicts)} ---")
-    decision = cli.ask(conflict)
+  try:
+    for i, conflict in enumerate(all_conflicts, 1):
+      print(f"\n  --- Конфликт {i}/{len(all_conflicts)} ---")
+      decision = cli.ask(conflict)
 
-    if decision.action == SyncAction.EXIT:
-      print("  Выход по запросу пользователя.")
-      break
+      if decision.action == SyncAction.EXIT:
+        print("  Выход по запросу пользователя.")
+        break
 
-    decisions.append(decision)
+      decisions.append(decision)
+
+  except KeyboardInterrupt:
+    print("\n\n  Прервано пользователем. Применяю принятые решения...")
+    logger.info(f"Interrupted by user. Applying {len(decisions)} decisions")
 
   if not decisions:
     print("  Нет принятых решений. Завершение.")
@@ -93,27 +106,24 @@ def main() -> None:
   changes = 0
 
   for shared_folder in config.shared_folders:
-    root_maps: dict[str, FolderNode | None] = {}
-
-    for name, profile in profiles.items():
-      assert profile.root is not None
-      folder = _ensure_folder(profile.root, shared_folder)
-      root_maps[name] = folder
-
-    folder_decisions = [
-      d for d in decisions if d.folder_path and d.folder_path[0] == shared_folder
-    ]
-
-    if folder_decisions:
-      syncer.apply_decisions(root_maps, folder_decisions)
-      changes += sum(
-        1 for d in folder_decisions if d.action in (SyncAction.ADD, SyncAction.REMOVE)
-      )
+    report = syncer.apply_decisions(shared_folder, decisions)
+    changes += report.changes_made
 
   for name, profile in profiles.items():
     assert profile.root is not None
 
-    bak = writer.write(profile.root, profile.filepath)
+    if dry_run:
+      print(f"  [DRY-RUN] Would write {name}: {profile.filepath}")
+      continue
+
+    try:
+      bak = writer.write(profile.root, profile.filepath)
+
+    except OSError as e:
+      logger.error(f"Write failed for {name}: {e}")
+      print(f"  [X] {name}: ошибка записи — {e}")
+      continue
+
     msg = f"  [V] {name}: сохранено"
 
     if bak:
@@ -127,16 +137,7 @@ def main() -> None:
   )
 
   print("\n  [V] Готово!")
-
-
-def _ensure_folder(bookmarks_bar: FolderNode, name: str) -> FolderNode:
-  folder = find_folder(bookmarks_bar, name)
-
-  if folder is None:
-    folder = FolderNode(name=name, add_date=now_ts(), last_modified=now_ts(), children=[])
-    bookmarks_bar.children.append(folder)
-
-  return folder
+  logger.info("Sync completed")
 
 
 if __name__ == "__main__":

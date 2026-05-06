@@ -1,7 +1,7 @@
-from __future__ import annotations
-
 import json
 from pathlib import Path
+
+from loguru import logger
 
 from src.models.config import AppConfig
 
@@ -18,7 +18,22 @@ def load_config(config_path: str = "config.json") -> AppConfig:
 
     raise ValueError("Invalid configuration file")
 
-  return AppConfig(profiles=data["profiles"], shared_folders=data["shared_folders"])
+  config = AppConfig(
+    profiles=data.get("profiles", {}),
+    shared_folders=data.get("shared_folders", []),
+  )
+
+  for name, path in config.profiles.items():
+    try:
+      with open(path, encoding="utf-8") as f:
+        first_line = f.readline(200).strip()
+        if not first_line.startswith("<!DOCTYPE NETSCAPE-Bookmark-file-1>"):
+          logger.warning(f"Profile '{name}' may not be a bookmark file: {path}")
+
+    except OSError:
+      pass
+
+  return config
 
 
 def _validate_raw(data: dict) -> list[str]:

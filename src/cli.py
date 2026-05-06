@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from src.models.sync import ConflictItem, SyncAction, UserDecision
 from src.utils import format_timestamp, is_folder_url
 

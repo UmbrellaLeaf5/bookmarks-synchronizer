@@ -26,7 +26,7 @@ ruff check --fix . && ruff format .
 ### Blank lines before control flow
 
 Insert a **blank line before** every `if`, `else`, `try`, `except`, `for`,
-`while`, `raise`, `with`, `finally`, `assert` that sits at the indentation margin of its containing
+`while`, `raise`, `with`, `finally`, `assert`, `return`, `continue` that sits at the indentation margin of its containing
 block. Deeply nested one-line conditionals (e.g. inside a tight loop) may omit
 the blank line.
 

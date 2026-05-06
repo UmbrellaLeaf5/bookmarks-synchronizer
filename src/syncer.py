@@ -1,14 +1,98 @@
-from __future__ import annotations
-
 import copy
 
-from src.models.sync import ConflictItem, SyncAction, UserDecision
+from loguru import logger
+
+from src.models.sync import ConflictItem, SyncAction, SyncReport, UserDecision
 from src.models.tree import BookmarkItem, FolderNode
-from src.utils import folder_name_from_url, is_folder_url, now_ts
+from src.utils import (
+  find_folder,
+  folder_name_from_url,
+  is_folder_url,
+  now_ts,
+)
 
 
 class Syncer:
-  def collect_conflicts(
+  def __init__(self, profile_roots: dict[str, FolderNode] | None = None) -> None:
+    self._roots: dict[str, FolderNode] = profile_roots or {}
+
+  def collect_conflicts(self, shared_folder: str) -> list[ConflictItem]:
+    folder_maps: dict[str, FolderNode | None] = self._build_maps(shared_folder)
+
+    return self._collect_inner(folder_maps, [shared_folder])
+
+  def apply_decisions(
+    self, shared_folder: str, decisions: list[UserDecision]
+  ) -> SyncReport:
+    report = SyncReport()
+    root_maps: dict[str, FolderNode | None] = self._build_maps(shared_folder)
+
+    folder_decisions = [
+      d for d in decisions if d.folder_path and d.folder_path[0] == shared_folder
+    ]
+
+    if not folder_decisions:
+      return report
+
+    for d in folder_decisions:
+      if d.action in (SyncAction.SKIP, SyncAction.EXIT):
+        continue
+
+      navigate_parts = d.folder_path[1:] if len(d.folder_path) > 1 else []
+
+      for profile_name in d.target_profiles:
+        folder = root_maps.get(profile_name)
+
+        if folder is None:
+          continue
+
+        target = self._navigate_auto_create(
+          folder, navigate_parts, root_maps, d.source_profile
+        )
+
+        if target is None:
+          logger.warning(
+            f"Cannot apply {d.action.value} for '{d.title}' in {profile_name}: "
+            f"folder path could not be resolved or auto-created"
+          )
+
+          continue
+
+        if d.action == SyncAction.ADD:
+          self._apply_add(target, d, root_maps, d.source_profile, navigate_parts)
+
+        elif d.action == SyncAction.REMOVE:
+          self._apply_remove(target, d)
+
+        report.changes_made += 1
+        report.decisions.append(d)
+
+    return report
+
+  def _build_maps(self, shared_folder: str) -> dict[str, FolderNode | None]:
+    maps: dict[str, FolderNode | None] = {}
+
+    for profile_name, root in self._roots.items():
+      if root.name == shared_folder:
+        maps[profile_name] = root
+        continue
+
+      folder = find_folder(root, shared_folder)
+
+      if folder is None:
+        folder = FolderNode(
+          name=shared_folder,
+          add_date=now_ts(),
+          last_modified=now_ts(),
+          children=[],
+        )
+        root.children.append(folder)
+
+      maps[profile_name] = folder
+
+    return maps
+
+  def _collect_inner(
     self,
     folder_maps: dict[str, FolderNode | None],
     path: list[str],
@@ -20,16 +104,19 @@ class Syncer:
     if not present_profiles:
       return conflicts
 
-    # Bookmark conflicts at this level
     url_presence: dict[str, dict[str, BookmarkItem]] = {}
+    subfolder_names: set[str] = set()
 
-    for pres_name in present_profiles:
-      folder = folder_maps[pres_name]
+    for profile_name in present_profiles:
+      folder = folder_maps[profile_name]
       assert folder is not None
 
       for child in folder.children:
         if isinstance(child, BookmarkItem):
-          url_presence.setdefault(child.url, {})[pres_name] = child
+          url_presence.setdefault(child.url, {})[profile_name] = child
+
+        elif isinstance(child, FolderNode):
+          subfolder_names.add(child.name)
 
     for url, presences in url_presence.items():
       present = sorted(presences.keys())
@@ -51,22 +138,12 @@ class Syncer:
         )
       )
 
-    # Folder-level conflicts
-    subfolder_names: set[str] = set()
-    for pres_name in present_profiles:
-      folder = folder_maps[pres_name]
-      assert folder is not None
-
-      for child in folder.children:
-        if isinstance(child, FolderNode):
-          subfolder_names.add(child.name)
-
     for sf_name in sorted(subfolder_names):
       sf_maps: dict[str, FolderNode | None] = {}
 
-      for pres_name in all_profiles:
-        if pres_name in present_profiles:
-          folder = folder_maps[pres_name]
+      for profile_name in all_profiles:
+        if profile_name in present_profiles:
+          folder = folder_maps[profile_name]
           assert folder is not None
 
           found = next(
@@ -78,10 +155,10 @@ class Syncer:
             None,
           )
 
-          sf_maps[pres_name] = found
+          sf_maps[profile_name] = found
 
         else:
-          sf_maps[pres_name] = None
+          sf_maps[profile_name] = None
 
       present_sf = sorted(p for p, f in sf_maps.items() if f is not None)
       missing_sf = sorted(p for p, f in sf_maps.items() if f is None)
@@ -102,39 +179,9 @@ class Syncer:
       existing_maps: dict[str, FolderNode | None] = dict(filtered)
 
       if existing_maps:
-        conflicts.extend(self.collect_conflicts(existing_maps, [*path, sf_name]))
+        conflicts.extend(self._collect_inner(existing_maps, [*path, sf_name]))
 
     return conflicts
-
-  def apply_decisions(
-    self,
-    shared_root_maps: dict[str, FolderNode | None],
-    decisions: list[UserDecision],
-  ) -> None:
-    for d in decisions:
-      if d.action in (SyncAction.SKIP, SyncAction.EXIT):
-        continue
-
-      navigate_parts = d.folder_path[1:] if len(d.folder_path) > 1 else []
-
-      for profile_name in d.target_profiles:
-        folder = shared_root_maps.get(profile_name)
-
-        if folder is None:
-          continue
-
-        target = self._navigate_auto_create(
-          folder, navigate_parts, shared_root_maps, d.source_profile
-        )
-
-        if target is None:
-          continue
-
-        if d.action == SyncAction.ADD:
-          self._apply_add(target, d, shared_root_maps, d.source_profile, navigate_parts)
-
-        elif d.action == SyncAction.REMOVE:
-          self._apply_remove(target, d)
 
   def _navigate_auto_create(
     self,
