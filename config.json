@@ -1,0 +1,11 @@
+{
+  "profiles": {
+    "pc": "bookmarks/bookmarks_for_pc.html",
+    "study": "bookmarks/bookmarks_for_study.html",
+    "work": "bookmarks/bookmarks_for_work.html"
+  },
+  "shared_folders": [
+    "Tools",
+    "Important"
+  ]
+}

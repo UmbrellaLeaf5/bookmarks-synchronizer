@@ -1,0 +1,53 @@
+from __future__ import annotations
+
+import json
+from dataclasses import dataclass
+from pathlib import Path
+
+
+@dataclass
+class AppConfig:
+  profiles: dict[str, str]
+  shared_folders: list[str]
+
+
+def load_config(config_path: str = "config.json") -> AppConfig:
+  with open(config_path, encoding="utf-8") as f:
+    data = json.load(f)
+
+  errors = validate_config_raw(data)
+  if errors:
+    for e in errors:
+      print(f"  [X] {e}")
+    raise ValueError("Invalid configuration file")
+
+  return AppConfig(
+    profiles=data["profiles"],
+    shared_folders=data["shared_folders"],
+  )
+
+
+def validate_config_raw(data: dict) -> list[str]:
+  errors: list[str] = []
+
+  if "profiles" not in data or not isinstance(data["profiles"], dict):
+    errors.append("Missing or invalid 'profiles' section")
+    return errors
+
+  if not data["profiles"]:
+    errors.append("No profiles defined")
+
+  for name, path in data["profiles"].items():
+    if not isinstance(name, str) or not name.strip():
+      errors.append(f"Invalid profile name: {name!r}")
+    if not isinstance(path, str) or not path.strip():
+      errors.append(f"Empty file path for profile '{name}'")
+    elif not Path(path).exists():
+      errors.append(f"File not found for profile '{name}': {path}")
+
+  if "shared_folders" not in data or not isinstance(data["shared_folders"], list):
+    errors.append("Missing or invalid 'shared_folders' section")
+  elif not data["shared_folders"]:
+    errors.append("No shared folders defined")
+
+  return errors
