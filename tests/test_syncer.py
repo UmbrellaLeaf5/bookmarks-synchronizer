@@ -198,7 +198,7 @@ class TestCollectConflicts:
     assert folder_cf[0].folder_path == ["Root", "Neyro"]
 
 
-# === apply_decisions — Bug 1: deep-copy folder ===
+# === apply_decisions - Bug 1: deep-copy folder ===
 
 
 class TestApplyDecisionsFolderAdd:
@@ -311,7 +311,7 @@ class TestApplyDecisionsFolderAdd:
       assert count_bookmarks(c) == 2  # noqa: PLR2004
 
 
-# === apply_decisions — Bug 2: auto-create parent folder ===
+# === apply_decisions - Bug 2: auto-create parent folder ===
 
 
 class TestAutoCreateParent:
@@ -424,7 +424,7 @@ class TestAutoCreateParent:
     assert len(urls) == len(set(urls)), f"Duplicate URLs found: {urls}"
 
 
-# === apply_decisions — Bug 3: icon preservation ===
+# === apply_decisions - Bug 3: icon preservation ===
 
 
 class TestIconPreservation:

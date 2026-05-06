@@ -16,7 +16,7 @@ from src.writer import write_bookmark_file
 
 def main() -> None:
   print("=" * 60)
-  print("  Bookmarks Manager — синхронизация закладок Chrome")
+  print("  Bookmarks Manager - синхронизация закладок Chrome")
   print("=" * 60)
 
   # 1. Load config
