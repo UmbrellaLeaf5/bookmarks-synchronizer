@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import time
 from dataclasses import dataclass, field
 
@@ -13,7 +14,8 @@ class ConflictItem:
   present_in: list[str]
   missing_from: list[str]
   add_date: int
-  folder_path: str
+  folder_path: list[str]
+  icon: str | None = None
 
 
 @dataclass
@@ -21,9 +23,11 @@ class UserDecision:
   url: str
   title: str
   add_date: int
-  folder_path: str
+  folder_path: list[str]
   action: str
   target_profiles: list[str]
+  icon: str | None = None
+  source_profile: str | None = None
 
 
 @dataclass
@@ -52,7 +56,7 @@ def count_bookmarks(node: FolderNode) -> int:
 
 def collect_conflicts(
   folder_maps: dict[str, FolderNode | None],
-  path: str,
+  path: list[str],
 ) -> list[ConflictItem]:
   conflicts: list[ConflictItem] = []
   all_profiles = list(folder_maps.keys())
@@ -84,6 +88,7 @@ def collect_conflicts(
         missing_from=missing,
         add_date=best.add_date,
         folder_path=path,
+        icon=best.icon,
       )
     )
 
@@ -128,7 +133,7 @@ def collect_conflicts(
     filtered = ((p, f) for p, f in sf_maps.items() if f is not None)
     existing_maps: dict[str, FolderNode | None] = dict(filtered)
     if existing_maps:
-      conflicts.extend(collect_conflicts(existing_maps, f"{path}/{sf_name}"))
+      conflicts.extend(collect_conflicts(existing_maps, [*path, sf_name]))
 
   return conflicts
 
@@ -141,73 +146,134 @@ def apply_decisions(
     if d.action == "skip":
       continue
 
-    path_parts = d.folder_path.split("/")
+    path_parts = d.folder_path
     navigate_parts = path_parts[1:] if len(path_parts) > 1 else []
 
     for profile_name in d.target_profiles:
-      if profile_name not in shared_root_maps:
-        continue
-
-      folder = shared_root_maps[profile_name]
+      folder = shared_root_maps.get(profile_name)
       if folder is None:
         continue
 
-      # Navigate to the target subfolder
-      target = folder
-      for part in navigate_parts:
-        found = next(
-          (c for c in target.children if isinstance(c, FolderNode) and c.name == part),
-          None,
-        )
-        if found is None:
-          break
-        target = found
-      else:
-        _apply_change(target, d)
-
-
-def _apply_change(folder: FolderNode, decision: UserDecision) -> None:
-  if decision.action == "add":
-    if decision.url.startswith("__folder__"):
-      fname = decision.url.split(":", 1)[1]
-      has_folder = any(
-        isinstance(c, FolderNode) and c.name == fname for c in folder.children
+      # Navigate to the target subfolder, auto-creating missing folders
+      target = _navigate_auto_create(
+        folder, navigate_parts, shared_root_maps, d.source_profile
       )
-      if not has_folder:
-        folder.children.append(
-          FolderNode(
-            name=fname,
-            add_date=now_ts(),
-            last_modified=now_ts(),
-            children=[],
-          )
-        )
-        folder.last_modified = now_ts()
-    elif not any(
-      isinstance(c, BookmarkItem) and c.url == decision.url for c in folder.children
-    ):
-      folder.children.append(
-        BookmarkItem(
-          title=decision.title,
-          url=decision.url,
-          add_date=decision.add_date or now_ts(),
-        )
-      )
-      folder.last_modified = now_ts()
+      if target is None:
+        continue
 
-  elif decision.action == "remove":
-    if decision.url.startswith("__folder__"):
-      fname = decision.url.split(":", 1)[1]
-      folder.children = [
-        c for c in folder.children if not (isinstance(c, FolderNode) and c.name == fname)
-      ]
+      if d.action == "add":
+        _apply_add(target, d, shared_root_maps, d.source_profile, navigate_parts)
+      elif d.action == "remove":
+        _apply_remove(target, d)
+      elif d.action == "skip":
+        pass
+
+
+def _navigate_auto_create(
+  folder: FolderNode,
+  navigate_parts: list[str],
+  root_maps: dict[str, FolderNode | None],
+  source_profile: str | None,
+) -> FolderNode | None:
+  """Navigate into subfolders, auto-creating missing ones by deep-copying from source."""
+  target = folder
+  i = 0
+  while i < len(navigate_parts):
+    part = navigate_parts[i]
+    child = next(
+      (c for c in target.children if isinstance(c, FolderNode) and c.name == part),
+      None,
+    )
+    if child is None:
+      child = _deep_copy_child(root_maps, source_profile, navigate_parts[:i], part)
+      if child is None:
+        return None
+      target.children.append(child)
+      target.last_modified = now_ts()
+    target = child
+    i += 1
+  return target
+
+
+def _deep_copy_child(
+  root_maps: dict[str, FolderNode | None],
+  source_profile: str | None,
+  parent_parts: list[str],
+  child_name: str,
+) -> FolderNode | None:
+  """Find a child folder in the source profile at a given path and deep-copy it."""
+  if not source_profile or source_profile not in root_maps:
+    return None
+  src = root_maps[source_profile]
+  if src is None:
+    return None
+  cur = src
+  for part in parent_parts:
+    found = next(
+      (c for c in cur.children if isinstance(c, FolderNode) and c.name == part),
+      None,
+    )
+    if found is None:
+      return None
+    cur = found
+  child = next(
+    (c for c in cur.children if isinstance(c, FolderNode) and c.name == child_name),
+    None,
+  )
+  if child is None:
+    return None
+  return copy.deepcopy(child)
+
+
+def _apply_add(
+  folder: FolderNode,
+  decision: UserDecision,
+  root_maps: dict[str, FolderNode | None],
+  source_profile: str | None,
+  parent_parts: list[str],
+) -> None:
+  if decision.url.startswith("__folder__"):
+    fname = decision.url.split(":", 1)[1]
+    if any(isinstance(c, FolderNode) and c.name == fname for c in folder.children):
+      return
+    source_folder = _deep_copy_child(root_maps, source_profile, parent_parts, fname)
+    if source_folder is not None:
+      folder.children.append(source_folder)
     else:
-      folder.children = [
-        c
-        for c in folder.children
-        if not (isinstance(c, BookmarkItem) and c.url == decision.url)
-      ]
+      folder.children.append(
+        FolderNode(name=fname, add_date=now_ts(), last_modified=now_ts(), children=[])
+      )
     folder.last_modified = now_ts()
+  else:
+    has_url = any(
+      isinstance(c, BookmarkItem) and c.url == decision.url for c in folder.children
+    )
+    if has_url:
+      return
+    folder.children.append(
+      BookmarkItem(
+        title=decision.title,
+        url=decision.url,
+        add_date=decision.add_date or now_ts(),
+        icon=decision.icon,
+      )
+    )
+    folder.last_modified = now_ts()
+
+
+def _apply_remove(folder: FolderNode, decision: UserDecision) -> None:
+  if decision.url.startswith("__folder__"):
+    fname = decision.url.split(":", 1)[1]
+    folder.children = [
+      c for c in folder.children if not (isinstance(c, FolderNode) and c.name == fname)
+    ]
+  else:
+    folder.children = [
+      c
+      for c in folder.children
+      if not (isinstance(c, BookmarkItem) and c.url == decision.url)
+    ]
+  folder.last_modified = now_ts()
 
 
 def now_ts() -> int:

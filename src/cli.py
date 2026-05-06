@@ -10,7 +10,7 @@ def ask_user_resolve(conflict: ConflictItem) -> UserDecision:
   print(f"  {conflict.title}")
   if not conflict.url.startswith("__folder__"):
     print(f"  {conflict.url}")
-  print(f"  Папка: {conflict.folder_path}")
+  print(f"  Папка: {'/'.join(conflict.folder_path)}")
   if conflict.add_date:
     print(f"  Добавлена: {format_timestamp(conflict.add_date)}")
   print(f"  Есть:        {', '.join(conflict.present_in)}")
@@ -30,6 +30,7 @@ def ask_user_resolve(conflict: ConflictItem) -> UserDecision:
 
   while True:
     choice = input("> ").strip().lower()
+    source = sorted(conflict.present_in)[0] if conflict.present_in else None
     if choice in ("д", "l", "d"):
       return UserDecision(
         url=conflict.url,
@@ -38,6 +39,8 @@ def ask_user_resolve(conflict: ConflictItem) -> UserDecision:
         folder_path=conflict.folder_path,
         action="add",
         target_profiles=conflict.missing_from,
+        icon=conflict.icon,
+        source_profile=source,
       )
     if choice in ("у", "e", "u"):
       return UserDecision(
@@ -47,6 +50,8 @@ def ask_user_resolve(conflict: ConflictItem) -> UserDecision:
         folder_path=conflict.folder_path,
         action="remove",
         target_profiles=conflict.present_in,
+        icon=conflict.icon,
+        source_profile=source,
       )
     if choice in ("п", "g", "p"):
       return UserDecision(
@@ -56,6 +61,8 @@ def ask_user_resolve(conflict: ConflictItem) -> UserDecision:
         folder_path=conflict.folder_path,
         action="skip",
         target_profiles=[],
+        icon=conflict.icon,
+        source_profile=source,
       )
     if choice in ("в", "d", "exit"):
       return UserDecision(
@@ -65,6 +72,8 @@ def ask_user_resolve(conflict: ConflictItem) -> UserDecision:
         folder_path=conflict.folder_path,
         action="exit",
         target_profiles=[],
+        icon=conflict.icon,
+        source_profile=source,
       )
     print("Неверный выбор. Введите д/у/п/в")
 

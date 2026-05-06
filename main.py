@@ -47,7 +47,7 @@ def main() -> None:
       assert profile.root is not None
       folder = find_folder(profile.root, shared_folder)
       folder_maps[name] = folder
-    conflicts = collect_conflicts(folder_maps, shared_folder)
+    conflicts = collect_conflicts(folder_maps, [shared_folder])
     all_conflicts.extend(conflicts)
     print(f'  Папка "{shared_folder}": {len(conflicts)} расхождений')
 
@@ -82,11 +82,8 @@ def main() -> None:
       folder = find_folder(profile.root, shared_folder)
       root_maps[name] = folder
 
-    sf_prefix = shared_folder + "/"
     folder_decisions = [
-      d
-      for d in decisions
-      if d.folder_path == shared_folder or d.folder_path.startswith(sf_prefix)
+      d for d in decisions if d.folder_path and d.folder_path[0] == shared_folder
     ]
     if folder_decisions:
       apply_decisions(root_maps, folder_decisions)
