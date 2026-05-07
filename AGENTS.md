@@ -2,7 +2,7 @@
 
 ## Project
 
-`bookmarks-manager` syncs Chrome bookmarks across multiple profiles. Exported
+`bookmarks-synchronizer` syncs Chrome bookmarks across multiple profiles. Exported
 HTML files live in `bookmarks/`, configured in `config.json`. Dev dependency: pytest.
 
 ## Commands
@@ -52,7 +52,7 @@ the blank line.
 
 - **2-space indentation** everywhere (ruff `indent-width = 2`)
 - **Line length**: 90 characters
-- **2 blank lines** between top-level definitions (classes, functions) —
+- **2 blank lines** between top-level definitions (classes, functions) -
   enforced by ruff `lines-after-imports = 2`
 - `from __future__ import annotations` is the first line in every `.py` file,
   followed by a blank line, then standard library imports, then project imports
@@ -70,7 +70,7 @@ def func(
 ### Exports
 
 - `src/models/__init__.py` uses `__all__` to declare public re-exports.
-  No `import X as X` or `# noqa` — ruff respects `__all__`.
+  No `import X as X` or `# noqa` - ruff respects `__all__`.
 
 ### Type annotations
 
@@ -80,21 +80,21 @@ def func(
 
 ## Data model quirks
 
-- **URL is the primary key** for bookmark identity — two bookmarks with the
+- **URL is the primary key** for bookmark identity - two bookmarks with the
   same HREF are considered the same bookmark regardless of title
 - **`__folder__:NAME`** is a sentinel URL prefix in `ConflictItem.url` and
   `UserDecision.url` used to distinguish folder-level conflicts from bookmark
   conflicts. Use `is_folder_url()` / `folder_name_from_url()` from `utils.py`.
-- **`folder_path` is `list[str]`**, not a string — folder names may contain
+- **`folder_path` is `list[str]`**, not a string - folder names may contain
   `/` (e.g. `"Info/program"` is a single folder name)
 - `SyncAction` is a `str, Enum` with values `"add"`, `"remove"`, `"skip"`,
-  `"exit"` — never compare to raw strings
+  `"exit"` - never compare to raw strings
 
 ## Gotchas
 
-- **`copy.deepcopy` is used for folder cloning** — use `FolderNode.deep_copy()`
+- **`copy.deepcopy` is used for folder cloning** - use `FolderNode.deep_copy()`
   or `Syncer._deep_copy_child()`
 - **Backup files** go to `bookmarks/backups/` (gitignored), named with
   timestamp: `{stem}_YYYYMMDD_HHMMSS.html`
-- **The writer performs a backup before every write** — the first run on a new
+- **The writer performs a backup before every write** - the first run on a new
   file creates no backup, subsequent runs create one

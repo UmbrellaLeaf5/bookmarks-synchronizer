@@ -14,12 +14,12 @@ from src.writer import Writer
 
 def main() -> None:
   setup_logging()
-  logger.info("Bookmarks Manager started")
+  logger.info("Bookmarks Synchronizer started")
 
   dry_run = "--dry-run" in sys.argv
 
   print("=" * 60)
-  print("  Bookmarks Manager — синхронизация закладок Chrome")
+  print("  Bookmarks Synchronizer - синхронизация закладок Chrome")
   if dry_run:
     print("  [DRY-RUN] Файлы не будут изменены")
   print("=" * 60)
@@ -121,7 +121,7 @@ def main() -> None:
 
     except OSError as e:
       logger.error(f"Write failed for {name}: {e}")
-      print(f"  [X] {name}: ошибка записи — {e}")
+      print(f"  [X] {name}: ошибка записи - {e}")
       continue
 
     msg = f"  [V] {name}: сохранено"
