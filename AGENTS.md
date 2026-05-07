@@ -2,99 +2,124 @@
 
 ## Project
 
-`bookmarks-synchronizer` syncs Chrome bookmarks across multiple profiles. Exported
-HTML files live in `bookmarks/`, configured in `config.json`. Dev dependency: pytest.
+Bookmarks Synchronizer - tool that finds and resolves discrepancies
+in shared Chrome bookmark folders across multiple browser profiles.
 
-## Commands
+## Setup
 
 ```bash
-uv sync                        # install dev deps (pytest)
-uv run main.py                 # run the tool interactively
+uv sync                # installs dependencies and creates .venv
+```
 
-# Verification pipeline (run in order):
-ruff check .                   # lint
-ruff format --check .          # format check
-pyright .                      # type-check src/ and main.py
-python -m pytest tests/ -v     # 38 tests
+Edit `config.json` - specify paths to bookmark HTML files and shared folder names.
 
-# Fix formatting:
+```bash
+uv run main.py              # interactive mode
+uv run main.py --dry-run    # check without writing changes
+```
+
+## Verify after changes
+
+Run **all** checks in this order - treat errors as blockers:
+
+```bash
+ruff check .                    # lint
+ruff format --check .           # formatting
+pyright .                       # type-check (adjust path if necessary)
+python -m pytest tests/ -v      # unit tests
+```
+
+**LSP is mandatory.** Configure `pyright-langserver` and `ruff server` in your
+editor. After every change, confirm lint, format, and type-check show **0
+errors**.
+
+## Fix formatting & imports
+
+```bash
 ruff check --fix . && ruff format .
+```
+
+## Run a single test
+
+```bash
+python -m pytest tests/test_file.py::test_name -v
 ```
 
 ## Code style
 
-### Blank lines before control flow
+### Indentation & layout
 
-Insert a **blank line before** every `if`, `else`, `try`, `except`, `for`,
-`while`, `raise`, `with`, `finally`, `assert`, `return`, `continue` that sits at the indentation margin of its containing
-block. Deeply nested one-line conditionals (e.g. inside a tight loop) may omit
-the blank line.
+- **2‑space indentation** everywhere.
+- **Line length**: 90 characters.
+- **2 blank lines** between top‑level definitions (functions, classes) and
+  after imports (`lines-after-imports = 2`).
+- **Blank line before control flow** - insert a blank line before every `if`,
+  `else`, `elif`, `for`, `while`, `try`, `except`, `finally`, `with`, `raise`,
+  `assert`, `return`, `continue` that sits at the same indentation level as its
+  containing block. Deeply nested one‑liners may omit the blank line.
 
-```python
-# Yes:
+  ```python
+  # Good
   result = compute()
 
   if result is None:
-    return
+      return
 
   for item in items:
-    process(item)
+      process(item)
+  ```
 
-# No:
-  result = compute()
-  if result is None:
-    return
-  for item in items:
-    process(item)
-```
+- **Endline after docstrings** - always put an extra blank line after a
+  function or class docstring.
 
-### Indentation and layout
+  ```python
+  def my_func():
+      """Docstring."""
 
-- **2-space indentation** everywhere (ruff `indent-width = 2`)
-- **Line length**: 90 characters
-- **2 blank lines** between top-level definitions (classes, functions) -
-  enforced by ruff `lines-after-imports = 2`
-- `from __future__ import annotations` is the first line in every `.py` file,
-  followed by a blank line, then standard library imports, then project imports
-- Long function signatures and calls are broken with **hanging indentation**:
+      # code starts after a blank line
+      ...
+  ```
 
-```python
-def func(
-  self,
-  arg1: str,
-  arg2: int,
-) -> ReturnType:
-  ...
-```
+- **Hanging indentation** for long signatures and calls:
 
-### Exports
+  ```python
+  def func(
+    self,
+    arg1: str,
+    arg2: int,
+  ) -> ReturnType:
+      ...
+  ```
 
-- `src/models/__init__.py` uses `__all__` to declare public re-exports.
-  No `import X as X` or `# noqa` - ruff respects `__all__`.
+### Imports
+
+- After editing imports, run `ruff check --fix` to sort them. Ruff’s `I` rule
+  handles ordering, grouping (stdlib → third‑party → project), and spacing.
 
 ### Type annotations
 
-- All functions have return type annotations
-- `from __future__ import annotations` everywhere (PEP 563)
-- pyright in `basic` mode, checks `src/` and `main.py` only
+- Every function **must** have a return type annotation.
+- `pyright` runs in `basic` mode.
 
-## Data model quirks
+### Exports
 
-- **URL is the primary key** for bookmark identity - two bookmarks with the
-  same HREF are considered the same bookmark regardless of title
-- **`__folder__:NAME`** is a sentinel URL prefix in `ConflictItem.url` and
-  `UserDecision.url` used to distinguish folder-level conflicts from bookmark
-  conflicts. Use `is_folder_url()` / `folder_name_from_url()` from `utils.py`.
-- **`folder_path` is `list[str]`**, not a string - folder names may contain
-  `/` (e.g. `"Info/program"` is a single folder name)
-- `SyncAction` is a `str, Enum` with values `"add"`, `"remove"`, `"skip"`,
-  `"exit"` - never compare to raw strings
+- In `__init__.py` files, declare the public API with `__all__`. Ruff respects
+  `__all__`, so you don’t need `import X as X` or `# noqa` comments.
 
-## Gotchas
+### Naming
 
-- **`copy.deepcopy` is used for folder cloning** - use `FolderNode.deep_copy()`
-  or `Syncer._deep_copy_child()`
-- **Backup files** go to `bookmarks/backups/` (gitignored), named with
-  timestamp: `{stem}_YYYYMMDD_HHMMSS.html`
-- **The writer performs a backup before every write** - the first run on a new
-  file creates no backup, subsequent runs create one
+- Prefer specific, descriptive names. Avoid ambiguous abbreviations.
+  - Example: `resolved_api_key` rather than `key` when multiple keys exist.
+
+## Testing quirks
+
+- Tests use shared fixtures from `tests/conftest.py` - `make_bookmark()`,
+  `make_folder()`, `TOOLS_PC_SUBTREE`, `TOOLS_WORK_SUBTREE`.
+- Test input files live in `bookmarks/` directory. Tests that parse
+  real HTML files (`test_parser.py`, integration tests in
+  `test_syncer.py`) depend on those files being present.
+
+## Miscellaneous
+
+- **Never edit `uv.lock` manually.** It is regenerated by `uv lock` or
+  `uv sync` when dependencies change.
