@@ -11,25 +11,25 @@ class Cli:
     if not is_folder_url(conflict.url):
       print(f"  {conflict.url}")
 
-    print(f"  Папка: {'/'.join(conflict.folder_path)}")
+    print(f"  Folder: {'/'.join(conflict.folder_path)}")
 
     if conflict.add_date:
-      print(f"  Добавлена: {format_timestamp(conflict.add_date)}")
+      print(f"  Added: {format_timestamp(conflict.add_date)}")
 
-    print(f"  Есть:        {', '.join(conflict.present_in)}")
-    print(f"  Отсутствует: {', '.join(conflict.missing_from)}")
+    print(f"  Present in:  {', '.join(conflict.present_in)}")
+    print(f"  Missing from: {', '.join(conflict.missing_from)}")
     print()
 
     if is_folder_url(conflict.url):
-      print(f"  [д] Создать папку в: {', '.join(conflict.missing_from)}")
-      print(f"  [у] Удалить папку из: {', '.join(conflict.present_in)}")
+      print(f"  [a] Add folder to: {', '.join(conflict.missing_from)}")
+      print(f"  [r] Remove folder from: {', '.join(conflict.present_in)}")
 
     else:
-      print(f"  [д] Добавить в: {', '.join(conflict.missing_from)}")
-      print(f"  [у] Удалить из:  {', '.join(conflict.present_in)}")
+      print(f"  [a] Add to: {', '.join(conflict.missing_from)}")
+      print(f"  [r] Remove from:  {', '.join(conflict.present_in)}")
 
-    print("  [п] Пропустить")
-    print("  [в] Выход (сохранить текущие решения)")
+    print("  [s] Skip")
+    print("  [e] Exit (save current decisions)")
     print()
 
     source = sorted(conflict.present_in)[0] if conflict.present_in else None
@@ -37,7 +37,7 @@ class Cli:
     while True:
       choice = input("> ").strip().lower()
 
-      if choice in ("д", "l", "d"):
+      if choice in ("a", "l", "d"):
         return UserDecision(
           url=conflict.url,
           title=conflict.title,
@@ -49,7 +49,7 @@ class Cli:
           source_profile=source,
         )
 
-      if choice in ("у", "e", "u"):
+      if choice in ("r", "e", "u"):
         return UserDecision(
           url=conflict.url,
           title=conflict.title,
@@ -61,7 +61,7 @@ class Cli:
           source_profile=source,
         )
 
-      if choice in ("п", "g", "p"):
+      if choice in ("s", "g", "p"):
         return UserDecision(
           url=conflict.url,
           title=conflict.title,
@@ -73,7 +73,7 @@ class Cli:
           source_profile=source,
         )
 
-      if choice in ("в", "d", "exit"):
+      if choice in ("e", "d", "exit"):
         return UserDecision(
           url=conflict.url,
           title=conflict.title,
@@ -85,7 +85,7 @@ class Cli:
           source_profile=source,
         )
 
-      print("Неверный выбор. Введите д/у/п/в")
+      print("Invalid choice. Enter a/r/s/e")
 
   @staticmethod
   def show_summary(
@@ -95,7 +95,7 @@ class Cli:
   ) -> None:
     print()
     print("=" * 60)
-    print("  Итоги синхронизации")
-    print(f"  Всего расхождений:  {conflicts_found}")
-    print(f"  Пропущено/обработано: {decisions_made}")
-    print(f"  Изменений внесено:  {changes_applied}")
+    print("  Sync Summary")
+    print(f"  Total conflicts:     {conflicts_found}")
+    print(f"  Decisions made:      {decisions_made}")
+    print(f"  Changes applied:     {changes_applied}")

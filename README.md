@@ -1,45 +1,45 @@
 # Bookmarks Synchronizer
 
-Инструмент для синхронизации закладок Chrome между несколькими профилями.
+Tool for syncing Chrome bookmarks across multiple profiles.
 
-## Зачем нужен
+## Purpose
 
-Если у вас несколько профилей Chrome (например, личный, учебный, рабочий) - в каждом
-есть как уникальные папки закладок, так и общие (например, Tools, Important).
-Bookmarks Synchronizer находит расхождения в общих папках и помогает привести их
-к единому актуальному состоянию - без ручного копирования.
+If you have multiple Chrome profiles (e.g., personal, study, work) - each has
+both unique bookmark folders and shared ones (e.g., Tools, Important).
+Bookmarks Synchronizer finds discrepancies in shared folders and helps bring them
+to a unified up-to-date state - without manual copying.
 
-## Как работает
+## How it works
 
-1. Экспортируйте закладки из каждого профиля Chrome в HTML
-   (Ctrl+Shift+O → «Экспортировать закладки») и положите файлы в `bookmarks/`
-2. Настройте `config.json` - укажите пути к файлам и имена общих папок
-3. Запустите скрипт - он находит расхождения и предлагает решения по каждому:
-   - **д** - добавить закладку/папку во все профили, где её нет
-   - **у** - удалить закладку/папку из всех профилей
-   - **п** - пропустить (оставить как есть)
-4. Скрипт создаёт бэкапы изменённых файлов в `bookmarks/backups/`
-   (имя файла: `{оригинал}_YYYYMMDD_HHMMSS.html`)
-   и записывает обновлённые файлы
+1. Export bookmarks from each Chrome profile to HTML
+   (Ctrl+Shift+O → "Export bookmarks") and place files in `bookmarks/`
+2. Configure `config.json` - specify file paths and shared folder names
+3. Run the script - it finds discrepancies and suggests solutions for each:
+   - **a** - add bookmark/folder to all profiles where it's missing
+   - **r** - remove bookmark/folder from all profiles
+   - **s** - skip (leave as is)
+4. The script creates backups of modified files in `bookmarks/backups/`
+   (filename: `{original}_YYYYMMDD_HHMMSS.html`)
+   and writes updated files
 
-### Логирование
+### Logging
 
-Все операции синхронизации записываются в лог-файл `bookmarks/sync.log`
-(ротация при 1 МБ). Логирование выполняется только в файл - терминал
-остаётся чистым для интерактивного взаимодействия.
+All sync operations are logged to `bookmarks/sync.log`
+(1 MB rotation). Logging is file-only - terminal stays
+clean for interactive interaction.
 
-### Особенности синхронизации
+### Sync features
 
-- Папки, указанные в `shared_folders`, считаются общими - всё их содержимое
-  (включая вложенные подпапки) синхронизируется рекурсивно
-- Если общая папка отсутствует в каком-то профиле - она создаётся автоматически
-- При добавлении папки все её закладки и подпапки копируются из исходного профиля
+- Folders listed in `shared_folders` are considered shared - all their contents
+  (including nested subfolders) sync recursively
+- If a shared folder is missing in a profile - it's created automatically
+- When adding a folder, all its bookmarks and subfolders are copied from the source profile
   (deep copy)
-- Иконки закладок (favicon) сохраняются
-- Родительские папки создаются автоматически при необходимости
-- Поддерживаются имена папок со слэшем (например, `Info/program` - это одна папка)
+- Bookmark icons (favicon) are preserved
+- Parent folders are created automatically when needed
+- Folder names with slashes are supported (e.g., `Info/program` is a single folder)
 
-## Установка и запуск
+## Installation and usage
 
 ```bash
 uv venv .venv
@@ -47,16 +47,16 @@ source .venv/Scripts/activate
 uv sync
 ```
 
-Настройте `config.json` под свои профили.
+Configure `config.json` for your profiles.
 
 ```bash
-uv run main.py              # интерактивный режим
-uv run main.py --dry-run    # проверка без записи изменений
+uv run main.py              # interactive mode
+uv run main.py --dry-run    # check without writing changes
 ```
 
-Зависимости: `loguru` (логирование), `pytest` (dev).
+Dependencies: `loguru` (logging), `pytest` (dev).
 
-## Проверка кода
+## Code verification
 
 ```bash
 ruff check .
@@ -65,7 +65,7 @@ pyright .
 python -m pytest tests/ -v
 ```
 
-## Формат конфигурации
+## Configuration format
 
 ```json
 {
@@ -78,9 +78,9 @@ python -m pytest tests/ -v
 }
 ```
 
-- `profiles` - список профилей с путями к HTML-файлам
-- `shared_folders` - имена общих папок (включая всё вложенное содержимое)
+- `profiles` - list of profiles with paths to HTML files
+- `shared_folders` - names of shared folders (including all nested contents)
 
-## Лицензия
+## License
 
-Общественное достояние (Unlicense). Подробнее в [LICENSE](LICENSE).
+Public Domain (Unlicense). See [LICENSE](LICENSE) for details.

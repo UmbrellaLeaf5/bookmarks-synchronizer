@@ -135,7 +135,7 @@ class TestCollectConflicts:
     conflicts = Syncer({"a": tree_a, "b": tree_b}).collect_conflicts("Root")
     folder_cf = [c for c in conflicts if c.url.startswith("__folder__")]
     assert len(folder_cf) == 1
-    assert folder_cf[0].title == "[Папка] Sub"
+    assert folder_cf[0].title == "[Folder] Sub"
     assert folder_cf[0].present_in == ["a"]
     assert folder_cf[0].missing_from == ["b"]
 
@@ -178,7 +178,7 @@ class TestCollectConflicts:
     conflicts = Syncer({"a": root_a, "b": root_b}).collect_conflicts("Root")
     folder_cf = [c for c in conflicts if c.url.startswith("__folder__")]
     assert len(folder_cf) == 1
-    assert folder_cf[0].title == "[Папка] chats"
+    assert folder_cf[0].title == "[Folder] chats"
     assert folder_cf[0].folder_path == ["Root", "Neyro"]
 
 
@@ -196,7 +196,7 @@ class TestApplyDecisionsFolderAdd:
     dst, _, syncer = self._make_maps()
     d = UserDecision(
       url="__folder__:chats",
-      title="[Папка] chats",
+      title="[Folder] chats",
       add_date=0,
       folder_path=["Tools", "Neyro"],
       action="add",
@@ -216,7 +216,7 @@ class TestApplyDecisionsFolderAdd:
     dst, src, syncer = self._make_maps()
     d = UserDecision(
       url="__folder__:chats",
-      title="[Папка] chats",
+      title="[Folder] chats",
       add_date=0,
       folder_path=["Tools", "Neyro"],
       action="add",
@@ -246,7 +246,7 @@ class TestApplyDecisionsFolderAdd:
     before = count_bookmarks(dst)
     d = UserDecision(
       url="__folder__:chats",
-      title="[Папка] chats",
+      title="[Folder] chats",
       add_date=0,
       folder_path=["Tools", "Neyro"],
       action="add",
@@ -260,7 +260,7 @@ class TestApplyDecisionsFolderAdd:
     dst = copy.deepcopy(TOOLS_PC_SUBTREE)
     d = UserDecision(
       url="__folder__:NewFolder",
-      title="[Папка] NewFolder",
+      title="[Folder] NewFolder",
       add_date=0,
       folder_path=["Tools"],
       action="add",
@@ -280,7 +280,7 @@ class TestApplyDecisionsFolderAdd:
     syncer = Syncer({"pc": dst_pc, "study": dst_study, "work": src})
     d = UserDecision(
       url="__folder__:chats",
-      title="[Папка] chats",
+      title="[Folder] chats",
       add_date=0,
       folder_path=["Tools", "Neyro"],
       action="add",
@@ -383,7 +383,7 @@ class TestAutoCreateParent:
 
     d_folder = UserDecision(
       url="__folder__:chats",
-      title="[Папка] chats",
+      title="[Folder] chats",
       add_date=0,
       folder_path=["Tools", "Neyro"],
       action="add",
@@ -468,7 +468,7 @@ class TestIconPreservation:
 
     d = UserDecision(
       url="__folder__:ToRemove",
-      title="[Папка] ToRemove",
+      title="[Folder] ToRemove",
       add_date=0,
       folder_path=["Tools", "Neyro"],
       action="remove",

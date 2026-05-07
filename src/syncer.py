@@ -167,7 +167,7 @@ class Syncer:
         conflicts.append(
           ConflictItem(
             url=f"__folder__:{sf_name}",
-            title=f"[Папка] {sf_name}",
+            title=f"[Folder] {sf_name}",
             present_in=present_sf,
             missing_from=missing_sf,
             add_date=0,

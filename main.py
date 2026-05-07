@@ -19,9 +19,9 @@ def main() -> None:
   dry_run = "--dry-run" in sys.argv
 
   print("=" * 60)
-  print("  Bookmarks Synchronizer - синхронизация закладок Chrome")
+  print("  Bookmarks Synchronizer - Chrome bookmarks sync")
   if dry_run:
-    print("  [DRY-RUN] Файлы не будут изменены")
+    print("  [DRY-RUN] Files will not be modified")
   print("=" * 60)
 
   parser = Parser()
@@ -30,7 +30,7 @@ def main() -> None:
   cli = Cli()
 
   # 1. Load config
-  print("\n[1/5] Загрузка конфигурации...")
+  print("\n[1/5] Loading configuration...")
 
   try:
     config = load_config("config.json")
@@ -40,11 +40,11 @@ def main() -> None:
     print(f"  [X] {e}")
     return
 
-  print(f"  Профилей: {', '.join(config.profiles.keys())}")
-  print(f"  Общие папки: {', '.join(config.shared_folders)}")
+  print(f"  Profiles: {', '.join(config.profiles.keys())}")
+  print(f"  Shared folders: {', '.join(config.shared_folders)}")
 
   # 2. Parse profiles
-  print("\n[2/5] Чтение файлов закладок...")
+  print("\n[2/5] Reading bookmark files...")
   profiles: dict[str, Profile] = {}
 
   for name, path in config.profiles.items():
@@ -52,57 +52,57 @@ def main() -> None:
     root = parser.parse(path)
     total = count_bookmarks(root)
     profiles[name] = Profile(name=name, filepath=path, root=root)
-    print(f"  [V] {name}: {total} закладок")
+    print(f"  [V] {name}: {total} bookmarks")
 
-  print("  [V] Все файлы прочитаны")
+  print("  [V] All files read")
 
   syncer = Syncer(
     {name: profile.root for name, profile in profiles.items() if profile.root is not None}
   )
 
   # 3. Collect conflicts
-  print("\n[3/5] Поиск расхождений в общих папках...")
+  print("\n[3/5] Searching for conflicts in shared folders...")
   all_conflicts = []
 
   for shared_folder in config.shared_folders:
     conflicts = syncer.collect_conflicts(shared_folder)
     all_conflicts.extend(conflicts)
 
-    print(f'  Папка "{shared_folder}": {len(conflicts)} расхождений')
+    print(f'  Folder "{shared_folder}": {len(conflicts)} conflicts')
 
   if not all_conflicts:
-    print("\n  [V] Расхождений нет. Все профили синхронизированы.")
+    print("\n  [V] No conflicts. All profiles synchronized.")
     logger.info("No conflicts found, exiting")
     return
 
-  print(f"\n  Всего расхождений: {len(all_conflicts)}")
+  print(f"\n  Total conflicts: {len(all_conflicts)}")
 
   # 4. Interactive resolution
-  print("\n[4/5] Разрешение конфликтов (д/у/п/в для каждого)...")
+  print("\n[4/5] Resolving conflicts (a/r/s/e for each)...")
 
   decisions = []
 
   try:
     for i, conflict in enumerate(all_conflicts, 1):
-      print(f"\n  --- Конфликт {i}/{len(all_conflicts)} ---")
+      print(f"\n  --- Conflict {i}/{len(all_conflicts)} ---")
       decision = cli.ask(conflict)
 
       if decision.action == SyncAction.EXIT:
-        print("  Выход по запросу пользователя.")
+        print("  Exit by user request.")
         break
 
       decisions.append(decision)
 
   except KeyboardInterrupt:
-    print("\n\n  Прервано пользователем. Применяю принятые решения...")
+    print("\n\n  Interrupted by user. Applying accepted decisions...")
     logger.info(f"Interrupted by user. Applying {len(decisions)} decisions")
 
   if not decisions:
-    print("  Нет принятых решений. Завершение.")
+    print("  No decisions made. Exiting.")
     return
 
   # 5. Apply and write
-  print(f"\n[5/5] Применение {len(decisions)} решений...")
+  print(f"\n[5/5] Applying {len(decisions)} decisions...")
   changes = 0
 
   for shared_folder in config.shared_folders:
@@ -121,13 +121,13 @@ def main() -> None:
 
     except OSError as e:
       logger.error(f"Write failed for {name}: {e}")
-      print(f"  [X] {name}: ошибка записи - {e}")
+      print(f"  [X] {name}: write error - {e}")
       continue
 
-    msg = f"  [V] {name}: сохранено"
+    msg = f"  [V] {name}: saved"
 
     if bak:
-      msg += f" (бэкап: {bak})"
+      msg += f" (backup: {bak})"
     print(msg)
 
   cli.show_summary(
@@ -136,7 +136,7 @@ def main() -> None:
     changes_applied=changes,
   )
 
-  print("\n  [V] Готово!")
+  print("\n  [V] Done!")
   logger.info("Sync completed")
 
 
